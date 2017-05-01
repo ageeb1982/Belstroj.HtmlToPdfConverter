@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Web;
 using iTextSharp.text;
@@ -11,41 +12,47 @@ using System.IO;
 using System.util;
 using System.Text.RegularExpressions;
 using System.Web.UI;
+using Microsoft.Azure; 
+using Microsoft.WindowsAzure.Storage; 
+using Microsoft.WindowsAzure.Storage.Blob; 
 
 namespace Belstroj.HtmlToPdfConverterWeb
 {
     public class PdfConverter
     {
-        public static void ConvertHTMLToPDF(string HTMLCode, string rootWebUrl)
+        public static void ConvertHtmltoPdf(string htmlCode)
         {
-            HttpContext context = HttpContext.Current;
-            
-            System.IO.StringWriter stringWrite = new StringWriter();
-            System.Web.UI.HtmlTextWriter htmlWrite = new HtmlTextWriter(stringWrite);
+            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(CloudConfigurationManager.GetSetting("StorageConnectionString"));
+            CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
+            CloudBlobContainer container = blobClient.GetContainerReference("pdfcontainer");
+            container.CreateIfNotExists();
+            container.SetPermissions(new BlobContainerPermissions { PublicAccess = BlobContainerPublicAccessType.Blob });
 
-            StringReader reader = new StringReader(HTMLCode);
+            StringWriter stringWrite = new StringWriter();
+            HtmlTextWriter htmlWrite = new HtmlTextWriter(stringWrite);
+
+            StringReader reader = new StringReader(htmlCode);
 
             //Create PDF document
             Document doc = new Document(PageSize.A4);
             var parser = new HTMLWorker(doc);
-            PdfWriter.GetInstance(doc, new FileStream("/App_Data/HTMLToPDF.pdf", FileMode.Create));
+
+            CloudBlockBlob blockBlob = container.GetBlockBlobReference("testFile.pdf");
+            Stream msPdf = new MemoryStream();
+            // Create or overwrite the "myblob" blob with contents from a local file.
+            PdfWriter.GetInstance(doc, msPdf);
             doc.Open();
-
             var interfaceProps = new Dictionary<string, Object>();
-            var ih = new ImageHander() { BaseUri = rootWebUrl };
-
+            var ih = new ImageHander();
             interfaceProps.Add(HTMLWorker.IMG_PROVIDER, ih);
-
             foreach (IElement element in HTMLWorker.ParseToList(
-            new StringReader(HTMLCode), null))
+            new StringReader(htmlCode), null))
             {
                 doc.Add(element);
             }
+            blockBlob.UploadFromStream(msPdf);
             doc.Close();
-            
         }
-
-        //handle Image relative and absolute URL's
     }
 
     public class ImageHander : IImageProvider
@@ -56,21 +63,8 @@ namespace Belstroj.HtmlToPdfConverterWeb
         ChainedProperties cprops,
         IDocListener doc)
         {
-            string imgPath = string.Empty;
-
-            if (src.ToLower().Contains("http://") == false)
-            {
-                imgPath = HttpContext.Current.Request.Url.Scheme + "://" +
-
-                HttpContext.Current.Request.Url.Authority + src;
-            }
-            else
-            {
-                imgPath = src;
-            }
-
+            var  imgPath = src;
             return iTextSharp.text.Image.GetInstance(imgPath);
         }
     }
-}
 }

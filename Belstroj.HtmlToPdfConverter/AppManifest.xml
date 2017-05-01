@@ -7,12 +7,17 @@
      SharePointMinVersion="16.0.0.0"
 >
   <Properties>
-    <Title>Belstroj.HtmlToPdfConverter</Title>
     <StartPage>~remoteAppUrl/?{StandardTokens}</StartPage>
     <InstalledEventEndpoint>~remoteAppUrl/Services/AppEventReceiver.svc</InstalledEventEndpoint>
+    <Title>Belstroj Html till PDF konvertering</Title>
   </Properties>
 
   <AppPrincipal>
     <RemoteWebApplication ClientId="*" />
   </AppPrincipal>
+  <AppPermissionRequests>
+    <AppPermissionRequest Scope="http://sharepoint/content/tenant" Right="FullControl" />
+    <AppPermissionRequest Scope="http://sharepoint/content/sitecollection" Right="FullControl" />
+    <AppPermissionRequest Scope="http://sharepoint/content/sitecollection/web" Right="FullControl" />
+  </AppPermissionRequests>
 </App>

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
@@ -56,14 +57,20 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
             {
                 if (clientContext != null)
                 {
-                    var projectList = clientContext.Web.Lists.GetById(properties.ItemEventProperties.ListId);
-                    var pdfConversionItem = projectList.GetItemById(properties.ItemEventProperties.ListItemId);
+                    var pdfConverterList = clientContext.Web.Lists.GetById(properties.ItemEventProperties.ListId);
+                    var pdfConversionItem = pdfConverterList.GetItemById(properties.ItemEventProperties.ListItemId);
                     clientContext.Load(pdfConversionItem, item => item[Properties.Resources.HtmlCode]);
                     clientContext.ExecuteQuery();
                     var htmlCode = pdfConversionItem[Properties.Resources.HtmlCode]?.ToString();
                     if (string.IsNullOrEmpty(htmlCode)){return;}
-
-                    PdfConverter.ConvertHTMLToPDF(htmlCode);
+                    var pdfDocumentList = clientContext.Web.Lists.GetByTitle(DocumentListName);
+                    clientContext.Load(pdfDocumentList, p => p.RootFolder);
+                    clientContext.ExecuteQuery();
+                    clientContext.Load(clientContext.Web, p => p.Url);
+                    clientContext.ExecuteQuery();
+                    PdfConverter.ConvertHtmltoPdf(htmlCode);
+                    
+                    
                 }
             }
         }
