@@ -1,70 +1,52 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Linq;
-using System.Web;
-using iTextSharp.text;
-using iTextSharp.text.html;
+﻿using iTextSharp;
 using iTextSharp.text.pdf;
-using iTextSharp.text.xml;
-using iTextSharp.text.html.simpleparser;
+using iTextSharp.text.html;
 using System.IO;
-using System.util;
-using System.Text.RegularExpressions;
-using System.Web.UI;
-using Microsoft.Azure; 
-using Microsoft.WindowsAzure.Storage; 
-using Microsoft.WindowsAzure.Storage.Blob; 
+using iTextSharp.text;
+using iTextSharp.tool.xml;
+using iTextSharp.tool.xml.css;
+using iTextSharp.tool.xml.html;
+using iTextSharp.tool.xml.parser;
+using iTextSharp.tool.xml.pipeline.css;
+using iTextSharp.tool.xml.pipeline.end;
+using iTextSharp.tool.xml.pipeline.html;
+using Microsoft.SharePoint.Client;
 
 namespace Belstroj.HtmlToPdfConverterWeb
 {
     public class PdfConverter
     {
-        public static void ConvertHtmltoPdf(string htmlCode)
+        public static byte[] ConvertHtmltoPdf(ClientContext context, Microsoft.SharePoint.Client.List documentLibrary, string result, string nameOfTheFile)
         {
-            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(CloudConfigurationManager.GetSetting("StorageConnectionString"));
-            CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
-            CloudBlobContainer container = blobClient.GetContainerReference("pdfcontainer");
-            container.CreateIfNotExists();
-            container.SetPermissions(new BlobContainerPermissions { PublicAccess = BlobContainerPublicAccessType.Blob });
-
-            StringWriter stringWrite = new StringWriter();
-            HtmlTextWriter htmlWrite = new HtmlTextWriter(stringWrite);
-
-            StringReader reader = new StringReader(htmlCode);
-
-            //Create PDF document
-            Document doc = new Document(PageSize.A4);
-            var parser = new HTMLWorker(doc);
-
-            CloudBlockBlob blockBlob = container.GetBlockBlobReference("testFile.pdf");
-            Stream msPdf = new MemoryStream();
-            // Create or overwrite the "myblob" blob with contents from a local file.
-            PdfWriter.GetInstance(doc, msPdf);
-            doc.Open();
-            var interfaceProps = new Dictionary<string, Object>();
-            var ih = new ImageHander();
-            interfaceProps.Add(HTMLWorker.IMG_PROVIDER, ih);
-            foreach (IElement element in HTMLWorker.ParseToList(
-            new StringReader(htmlCode), null))
+            using (var msOutput = new MemoryStream())
             {
-                doc.Add(element);
+                using (var stringReader = new StringReader(result))
+                {
+                    using (Document document = new Document())
+                    {
+                        var pdfWriter = PdfWriter.GetInstance(document, msOutput);
+                        pdfWriter.InitialLeading = 12.5f;
+                        document.Open();
+                        var xmlWorkerHelper = XMLWorkerHelper.GetInstance();
+                        var cssResolver = new StyleAttrCSSResolver();
+                        var xmlWorkerFontProvider = new XMLWorkerFontProvider();
+                        //foreach (string font in fonts)
+                        //{
+                        //    xmlWorkerFontProvider.Register(font);
+                        //}
+                        var cssAppliers = new CssAppliersImpl(xmlWorkerFontProvider);
+                        var htmlContext = new HtmlPipelineContext(cssAppliers);
+                        htmlContext.SetTagFactory(Tags.GetHtmlTagProcessorFactory());
+                        PdfWriterPipeline pdfWriterPipeline = new PdfWriterPipeline(document, pdfWriter);
+                        HtmlPipeline htmlPipeline = new HtmlPipeline(htmlContext, pdfWriterPipeline);
+                        CssResolverPipeline cssResolverPipeline = new CssResolverPipeline(cssResolver, htmlPipeline);
+                        XMLWorker xmlWorker = new XMLWorker(cssResolverPipeline, true);
+                        XMLParser xmlParser = new XMLParser(xmlWorker);
+                        xmlParser.Parse(stringReader);
+                    }
+                }
+                return msOutput.ToArray();
             }
-            blockBlob.UploadFromStream(msPdf);
-            doc.Close();
-        }
-    }
-
-    public class ImageHander : IImageProvider
-    {
-        public string BaseUri;
-        public iTextSharp.text.Image GetImage(string src,
-        IDictionary<string, string> h,
-        ChainedProperties cprops,
-        IDocListener doc)
-        {
-            var  imgPath = src;
-            return iTextSharp.text.Image.GetInstance(imgPath);
         }
     }
 }

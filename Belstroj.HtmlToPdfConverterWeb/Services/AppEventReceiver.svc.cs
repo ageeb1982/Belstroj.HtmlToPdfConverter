@@ -68,13 +68,36 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
                     clientContext.ExecuteQuery();
                     clientContext.Load(clientContext.Web, p => p.Url);
                     clientContext.ExecuteQuery();
-                    PdfConverter.ConvertHtmltoPdf(htmlCode);
-                    
-                    
+                    var fileName = GenerateUniqueName(clientContext, pdfDocumentList);
+                    var fileBytes = PdfConverter.ConvertHtmltoPdf(clientContext, pdfDocumentList, htmlCode, fileName);
+                    FileCreationInformation newFile = new FileCreationInformation
+                    {
+                        Content = fileBytes,
+                        Url = fileName
+                    };
+                    var uploadFile = pdfDocumentList.RootFolder.Files.Add(newFile);
+                    clientContext.ExecuteQuery();
+
                 }
             }
         }
-        
+
+        private string GenerateUniqueName(ClientContext context, List pdfDocumentList)
+        {
+            var q = new CamlQuery()
+            {
+                ViewXml = "<View><Query><OrderBy><FieldRef Name='ID' Ascending='False' /></OrderBy></Query><ViewFields><FieldRef Name='ID' /></ViewFields><RowLimit>1</RowLimit></View>", 
+            };
+            var r = pdfDocumentList.GetItems(q);
+            context.Load(r);
+            context.ExecuteQuery();
+            var highestIdString =  r[0]["ID"]?.ToString();
+            var highestId = 0;
+            int.TryParse(highestIdString, out highestId);
+            var fileName = "GeneratedPdf - " + highestId + ".pdf";
+            return fileName;
+        }
+
         private void HandleItemUpdating(SPRemoteEventProperties properties)
         {
            //Nothing here yet
