@@ -18,8 +18,9 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
     {
         private const string ReceiverNameAdded = "ItemAddedPdfConverterBelstroj";
         private const string ReceiverNameUpdated = "ItemUpdatedPdfConverterBelstroj";
-        private const string ListName = "Pdf Converter List";
-        private const string DocumentListName = "Pdf Converted Document list";
+        //private const string ListName = "Pdf Converter List";
+        //private const string DocumentListName = "Pdf Converted Document list";
+        private const string ListName = "Pdf Converted Document list";
 
         /// <summary>
         /// Handles app events that occur after the app is installed or upgraded, or when app is being uninstalled.
@@ -59,48 +60,84 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
                 {
                     var pdfConverterList = clientContext.Web.Lists.GetById(properties.ItemEventProperties.ListId);
                     var pdfConversionItem = pdfConverterList.GetItemById(properties.ItemEventProperties.ListItemId);
-                    clientContext.Load(pdfConversionItem, item => item[Properties.Resources.HtmlCode]);
-                    clientContext.ExecuteQuery();
-                    var htmlCode = pdfConversionItem[Properties.Resources.HtmlCode]?.ToString();
-                    if (string.IsNullOrEmpty(htmlCode)){return;}
-                    var pdfDocumentList = clientContext.Web.Lists.GetByTitle(DocumentListName);
-                    clientContext.Load(pdfDocumentList, p => p.RootFolder);
-                    clientContext.ExecuteQuery();
-                    clientContext.Load(clientContext.Web, p => p.Url);
-                    clientContext.ExecuteQuery();
-                    var fileName = GenerateUniqueName(clientContext, pdfDocumentList);
-                    var fileBytes = PdfConverter.ConvertHtmltoPdf(clientContext, pdfDocumentList, htmlCode, fileName);
-                    FileCreationInformation newFile = new FileCreationInformation
-                    {
-                        Content = fileBytes,
-                        Url = fileName
-                    };
-                    var uploadFile = pdfDocumentList.RootFolder.Files.Add(newFile);
-                    clientContext.ExecuteQuery();
-
+                    HandleItem(clientContext, pdfConverterList, pdfConversionItem);
                 }
             }
+        }
+
+        private void HandleItem(ClientContext clientContext, List pdfConverterList, ListItem pdfConversionItem)
+        {
+           
+            clientContext.Load(pdfConversionItem, item => item.File);
+            clientContext.ExecuteQuery();
+            var isTxtFile = pdfConversionItem.File.Name.EndsWith(".txt");
+            if (!isTxtFile)
+            {
+                return;
+            }
+            
+            var stream = pdfConversionItem.File.OpenBinaryStream();
+            clientContext.ExecuteQuery();
+            string htmlCode;
+            using (StreamReader reader = new StreamReader(stream.Value))
+            {
+                htmlCode = reader.ReadToEnd();
+            }
+            if (string.IsNullOrEmpty(htmlCode))
+            {
+                return;
+            }
+            var fileName = GenerateUniqueName(clientContext, pdfConverterList);
+            htmlCode = PdfConverter.CleanHtmlCodeForConversion(htmlCode);
+            var fileBytes = PdfConverter.ConvertHtmltoPdf(clientContext, pdfConverterList, htmlCode, fileName);
+            FileCreationInformation newFile = new FileCreationInformation
+            {
+                Content = fileBytes,
+                Url = fileName
+            };
+            var uploadFile = pdfConverterList.RootFolder.Files.Add(newFile);
+            clientContext.ExecuteQuery();
+
         }
 
         private string GenerateUniqueName(ClientContext context, List pdfDocumentList)
         {
             var q = new CamlQuery()
             {
-                ViewXml = "<View><Query><OrderBy><FieldRef Name='ID' Ascending='False' /></OrderBy></Query><ViewFields><FieldRef Name='ID' /></ViewFields><RowLimit>1</RowLimit></View>", 
+                ViewXml = "<View><Query><OrderBy><FieldRef Name='ID' Ascending='False' /></OrderBy></Query><ViewFields><FieldRef Name='ID' /></ViewFields><RowLimit>1</RowLimit></View>",
             };
             var r = pdfDocumentList.GetItems(q);
             context.Load(r);
             context.ExecuteQuery();
-            var highestIdString =  r[0]["ID"]?.ToString();
             var highestId = 0;
-            int.TryParse(highestIdString, out highestId);
+            if (r.Count <= 0)
+            {
+                highestId = 1;
+            }
+            else
+            {
+                var highestIdString = r[0]["ID"]?.ToString();
+
+                int.TryParse(highestIdString, out highestId);
+                highestId = highestId + 1;
+            }
+
             var fileName = "GeneratedPdf - " + highestId + ".pdf";
             return fileName;
         }
 
         private void HandleItemUpdating(SPRemoteEventProperties properties)
         {
-           //Nothing here yet
+            Trace.TraceInformation("New pdf object item updating, new pdf conversion started..");
+            using (ClientContext clientContext = TokenHelper.CreateRemoteEventReceiverClientContext(properties))
+            {
+                if (clientContext != null)
+                {
+                    var pdfConverterList = clientContext.Web.Lists.GetById(properties.ItemEventProperties.ListId);
+                    var pdfConversionItem = pdfConverterList.GetItemById(properties.ItemEventProperties.ListItemId);
+                    HandleItem(clientContext, pdfConverterList, pdfConversionItem);
+                }
+            }
         }
 
         private void HandleAppUninstalling(SPRemoteEventProperties properties)
@@ -183,7 +220,7 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
                 Trace.TraceInformation("DeleteReceiver failed");
             }
         }
-        
+
 
         /// <summary>
         /// This method is a required placeholder, but is not used by app events.

@@ -2,6 +2,9 @@
 using iTextSharp.text.pdf;
 using iTextSharp.text.html;
 using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using HtmlAgilityPack;
 using iTextSharp.text;
 using iTextSharp.tool.xml;
 using iTextSharp.tool.xml.css;
@@ -47,6 +50,26 @@ namespace Belstroj.HtmlToPdfConverterWeb
                 }
                 return msOutput.ToArray();
             }
+        }
+
+        public static string CleanHtmlCodeForConversion(string htmlCode)
+        {
+            htmlCode = RemoveBetween(htmlCode, "<!--", "-->");
+            HtmlDocument doc = new HtmlDocument();
+            doc.OptionFixNestedTags = true;
+            doc.LoadHtml(htmlCode);
+            var errors = doc.ParseErrors;
+            if (errors.Any())
+            {
+                
+            }
+            return doc.ToString();
+        }
+
+        private static string RemoveBetween(string s, string begin, string end)
+        {
+            Regex regex = new Regex(string.Format("\\{0}.*?\\{1}", begin, end));
+            return regex.Replace(s, string.Empty);
         }
     }
 }
