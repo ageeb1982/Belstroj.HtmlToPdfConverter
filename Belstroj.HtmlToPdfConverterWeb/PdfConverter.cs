@@ -14,6 +14,8 @@ using iTextSharp.tool.xml.pipeline.css;
 using iTextSharp.tool.xml.pipeline.end;
 using iTextSharp.tool.xml.pipeline.html;
 using Microsoft.SharePoint.Client;
+using System.Diagnostics;
+using System.Text;
 
 namespace Belstroj.HtmlToPdfConverterWeb
 {
@@ -55,15 +57,39 @@ namespace Belstroj.HtmlToPdfConverterWeb
         public static string CleanHtmlCodeForConversion(string htmlCode)
         {
             htmlCode = RemoveBetween(htmlCode, "<!--", "-->");
+            htmlCode = RemoveBetween(htmlCode, "<script", "</script>");
+            htmlCode = htmlCode.Replace("<head>", "");
+            htmlCode = htmlCode.Replace("</head>", "");
+            htmlCode = htmlCode.Replace("<body>", "");
+            htmlCode = htmlCode.Replace("</body>", "");
+           
             HtmlDocument doc = new HtmlDocument();
             doc.OptionFixNestedTags = true;
+            doc.OptionAutoCloseOnEnd = true;
+            doc.OptionWriteEmptyNodes = true;
+
+            doc.OptionDefaultStreamEncoding = Encoding.UTF8;
             doc.LoadHtml(htmlCode);
             var errors = doc.ParseErrors;
-            if (errors.Any())
+            foreach (var error in errors)
             {
-                
+                switch (error.Code)
+                {
+                        case HtmlParseErrorCode.EndTagNotRequired:
+                        //Trace.TraceInformation(error.Reason);
+                        continue;
+                        default:
+                        Trace.TraceInformation(error.Reason);
+                        continue;
+                }
             }
-            return doc.ToString();
+
+            return doc.DocumentNode.OuterHtml;
+        }
+
+        private static string FixImgClosingTag(string htmlCode)
+        {
+            throw new System.NotImplementedException();
         }
 
         private static string RemoveBetween(string s, string begin, string end)

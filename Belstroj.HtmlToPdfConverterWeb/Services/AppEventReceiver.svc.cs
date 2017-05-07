@@ -79,7 +79,7 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
             var stream = pdfConversionItem.File.OpenBinaryStream();
             clientContext.ExecuteQuery();
             string htmlCode;
-            using (StreamReader reader = new StreamReader(stream.Value))
+            using (StreamReader reader = new StreamReader(stream.Value, System.Text.Encoding.GetEncoding(1252), true))
             {
                 htmlCode = reader.ReadToEnd();
             }
