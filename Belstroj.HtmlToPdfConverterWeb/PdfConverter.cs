@@ -1,6 +1,6 @@
-﻿using iTextSharp;
+﻿using System;
+using System.Collections.Generic;
 using iTextSharp.text.pdf;
-using iTextSharp.text.html;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -32,13 +32,8 @@ namespace Belstroj.HtmlToPdfConverterWeb
                         var pdfWriter = PdfWriter.GetInstance(document, msOutput);
                         pdfWriter.InitialLeading = 12.5f;
                         document.Open();
-                        var xmlWorkerHelper = XMLWorkerHelper.GetInstance();
                         var cssResolver = new StyleAttrCSSResolver();
                         var xmlWorkerFontProvider = new XMLWorkerFontProvider();
-                        //foreach (string font in fonts)
-                        //{
-                        //    xmlWorkerFontProvider.Register(font);
-                        //}
                         var cssAppliers = new CssAppliersImpl(xmlWorkerFontProvider);
                         var htmlContext = new HtmlPipelineContext(cssAppliers);
                         htmlContext.SetTagFactory(Tags.GetHtmlTagProcessorFactory());
@@ -58,17 +53,14 @@ namespace Belstroj.HtmlToPdfConverterWeb
         {
             htmlCode = RemoveBetween(htmlCode, "<!--", "-->");
             htmlCode = RemoveBetween(htmlCode, "<script", "</script>");
-            htmlCode = htmlCode.Replace("<head>", "");
-            htmlCode = htmlCode.Replace("</head>", "");
-            htmlCode = htmlCode.Replace("<body>", "");
-            htmlCode = htmlCode.Replace("</body>", "");
-           
-            HtmlDocument doc = new HtmlDocument();
-            doc.OptionFixNestedTags = true;
-            doc.OptionAutoCloseOnEnd = true;
-            doc.OptionWriteEmptyNodes = true;
+            HtmlDocument doc = new HtmlDocument
+            {
+                OptionFixNestedTags = true,
+                OptionAutoCloseOnEnd = true,
+                OptionWriteEmptyNodes = true,
+                OptionDefaultStreamEncoding = Encoding.UTF8
+            };
 
-            doc.OptionDefaultStreamEncoding = Encoding.UTF8;
             doc.LoadHtml(htmlCode);
             var errors = doc.ParseErrors;
             foreach (var error in errors)
@@ -87,15 +79,16 @@ namespace Belstroj.HtmlToPdfConverterWeb
             return doc.DocumentNode.OuterHtml;
         }
 
-        private static string FixImgClosingTag(string htmlCode)
-        {
-            throw new System.NotImplementedException();
-        }
-
         private static string RemoveBetween(string s, string begin, string end)
         {
-            Regex regex = new Regex(string.Format("\\{0}.*?\\{1}", begin, end));
+            Regex regex = new Regex($"\\{begin}.*?\\{end}");
             return regex.Replace(s, string.Empty);
+        }
+
+        public static List<string> GetExternalCss(string htmlCode)
+        {
+            var x = htmlCode.Split(new[] { "<link href=" }, StringSplitOptions.None);
+            return (from y in x select y.Split(new [] {" rel=\"Stylesheet\" type=\"text/css\" />"}, StringSplitOptions.None)[0] into k where k.Length > 0 && k.Contains(".css") select k.Replace("\"", "")).ToList();
         }
     }
 }

@@ -96,8 +96,13 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
                 Url = fileName
             };
             var uploadFile = pdfConverterList.RootFolder.Files.Add(newFile);
+            
             clientContext.ExecuteQuery();
-
+            if (uploadFile != null)
+            {
+                //pdfConversionItem.DeleteObject();
+                //clientContext.ExecuteQuery();
+            }
         }
 
         private string GenerateUniqueName(ClientContext context, List pdfDocumentList)
