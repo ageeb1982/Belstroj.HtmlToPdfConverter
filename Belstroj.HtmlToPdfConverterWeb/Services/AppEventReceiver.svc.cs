@@ -42,8 +42,8 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
                 case SPRemoteEventType.ItemAdded:
                     HandleItemAdded(properties);
                     break;
-                case SPRemoteEventType.ItemUpdating:
-                    HandleItemUpdating(properties);
+                case SPRemoteEventType.ItemUpdated:
+                    HandleItemUpdated(properties);
                     break;
             }
 
@@ -60,12 +60,12 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
                 {
                     var pdfConverterList = clientContext.Web.Lists.GetById(properties.ItemEventProperties.ListId);
                     var pdfConversionItem = pdfConverterList.GetItemById(properties.ItemEventProperties.ListItemId);
-                    HandleItem(clientContext, pdfConverterList, pdfConversionItem);
+                    HandleItem(clientContext, pdfConverterList, pdfConversionItem, false);
                 }
             }
         }
 
-        private void HandleItem(ClientContext clientContext, List pdfConverterList, ListItem pdfConversionItem)
+        private void HandleItem(ClientContext clientContext, List pdfConverterList, ListItem pdfConversionItem, bool itemUpdated)
         {
            
             clientContext.Load(pdfConversionItem, item => item.File);
@@ -131,16 +131,16 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
             return fileName;
         }
 
-        private void HandleItemUpdating(SPRemoteEventProperties properties)
+        private void HandleItemUpdated(SPRemoteEventProperties properties)
         {
-            Trace.TraceInformation("New pdf object item updating, new pdf conversion started..");
+            Trace.TraceInformation("New pdf object item updated, new pdf conversion started..");
             using (ClientContext clientContext = TokenHelper.CreateRemoteEventReceiverClientContext(properties))
             {
                 if (clientContext != null)
                 {
                     var pdfConverterList = clientContext.Web.Lists.GetById(properties.ItemEventProperties.ListId);
                     var pdfConversionItem = pdfConverterList.GetItemById(properties.ItemEventProperties.ListItemId);
-                    HandleItem(clientContext, pdfConverterList, pdfConversionItem);
+                    HandleItem(clientContext, pdfConverterList, pdfConversionItem, true);
                 }
             }
         }
@@ -178,7 +178,7 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
                     }
                     foreach (var receiver in pdfList.EventReceivers.Where(receiver => receiver.ReceiverName == ReceiverNameUpdated))
                     {
-                        Trace.WriteLine("Found existing ItemAdded receiver at " + receiver.ReceiverUrl);
+                        Trace.WriteLine("Found existing ItemUpdated receiver at " + receiver.ReceiverUrl);
                         DeleteReceiver(clientContext, receiver);
                         break;
                     }
@@ -196,17 +196,17 @@ namespace Belstroj.HtmlToPdfConverterWeb.Services
                     clientContext.ExecuteQuery();
                     Trace.WriteLine("Added ItemAdded receiver at " + msg.Headers.To);
 
-                    EventReceiverDefinitionCreationInformation receiverUpdating =
+                    EventReceiverDefinitionCreationInformation receiverUpdated =
                         new EventReceiverDefinitionCreationInformation
                         {
-                            EventType = EventReceiverType.ItemUpdating,
+                            EventType = EventReceiverType.ItemUpdated,
                             ReceiverUrl = msg.Headers.To.ToString(),
                             ReceiverName = ReceiverNameUpdated,
                             Synchronization = EventReceiverSynchronization.Synchronous
                         };
-                    pdfList.EventReceivers.Add(receiverUpdating);
+                    pdfList.EventReceivers.Add(receiverUpdated);
                     clientContext.ExecuteQuery();
-                    Trace.WriteLine("Added ItemUpdating receiver at " + msg.Headers.To);
+                    Trace.WriteLine("Added ItemUpdated receiver at " + msg.Headers.To);
                 }
             }
         }
